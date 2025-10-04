@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的世界坐标转换计算器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <!-- 配置Tailwind自定义颜色 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'overworld': '#4CAF50',    // 主世界绿色
+                        'nether': '#E53935',      // 下界红色
+                        'minecraft': '#2C3E50',   // 游戏深色背景
+                        'minecraft-light': '#34495E' // 游戏浅色背景
+                    },
+                    fontFamily: {
+                        minecraft: ['Minecraft', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- 自定义工具类 -->
+    <!-- 注意：@apply 规则是 Tailwind CSS 的特殊语法，虽然 linter 会显示警告，但在使用 Tailwind CDN 时这些规则是有效的 -->
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .text-shadow {
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            }
+            .block-border {
+                border-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAEklEQVQImWNgYGD4z0AswK4SAFXuAf8EPy+xAAAAAElFTkSuQmCC') 2 repeat;
+            }
+            .input-style {
+                @apply bg-minecraft-light text-white border-2 border-gray-500 rounded-md px-3 py-2 focus:outline-none focus:border-overworld transition-all duration-300;
+            }
+            .btn-primary {
+                @apply bg-overworld hover:bg-overworld/80 text-white font-bold py-2 px-4 rounded transition-all duration-300 transform hover:scale-105 active:scale-95;
+            }
+            .btn-secondary {
+                @apply bg-nether hover:bg-nether/80 text-white font-bold py-2 px-4 rounded transition-all duration-300 transform hover:scale-105 active:scale-95;
+            }
+            .animate-fadeIn {
+                animation: fadeIn 0.5s ease-in-out;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-minecraft to-minecraft-light min-h-screen text-white font-sans">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- 标题区域 -->
+        <header class="text-center mb-10">
+            <h1 class="text-[clamp(2rem,5vw,3.5rem)] font-bold text-shadow mb-2 flex items-center justify-center">
+                <i class="fa fa-calculator mr-3 text-yellow-400"></i>
+                我的世界坐标转换计算器
+            </h1>
+            <p class="text-gray-300 text-lg">轻松在主世界与下界之间转换坐标 (1:8)</p>
+        </header>
+        
+        <!-- 主内容区 -->
+        <main class="grid md:grid-cols-2 gap-8">
+            <!-- 主世界坐标输入 -->
+            <div class="bg-minecraft-light/60 backdrop-blur-sm rounded-xl p-6 shadow-xl border border-overworld/30 transform transition-all duration-500 hover:shadow-overworld/20">
+                <div class="flex items-center mb-4">
+                    <div class="w-10 h-10 rounded-full bg-overworld flex items-center justify-center mr-3">
+                        <i class="fa fa-tree text-white text-xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold">主世界坐标</h2>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <label for="overworld-x" class="block text-sm font-medium text-gray-300 mb-1">X</label>
+                            <input type="number" id="overworld-x" class="input-style w-full" placeholder="X坐标">
+                        </div>
+                        <div>
+                            <label for="overworld-y" class="block text-sm font-medium text-gray-300 mb-1">Y</label>
+                            <input type="number" id="overworld-y" class="input-style w-full" placeholder="Y坐标">
+                        </div>
+                        <div>
+                            <label for="overworld-z" class="block text-sm font-medium text-gray-300 mb-1">Z</label>
+                            <input type="number" id="overworld-z" class="input-style w-full" placeholder="Z坐标">
+                        </div>
+                    </div>
+                    
+                    <button id="to-nether-btn" class="btn-primary w-full mt-4">
+                        <i class="fa fa-arrow-right mr-2"></i>转换到下界坐标
+                    </button>
+                </div>
+                
+                <div id="nether-result" class="mt-6 p-4 bg-nether/20 rounded-lg hidden">
+                    <h3 class="font-bold text-lg mb-2 flex items-center">
+                        <i class="fa fa-fire text-nether mr-2"></i>对应的下界坐标:
+                    </h3>
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                        <div class="bg-minecraft p-2 rounded">
+                            <span class="text-sm text-gray-400">X</span>
+                            <p id="result-nether-x" class="font-bold"></p>
+                        </div>
+                        <div class="bg-minecraft p-2 rounded">
+                            <span class="text-sm text-gray-400">Y</span>
+                            <p id="result-nether-y" class="font-bold"></p>
+                        </div>
+                        <div class="bg-minecraft p-2 rounded">
+                            <span class="text-sm text-gray-400">Z</span>
+                            <p id="result-nether-z" class="font-bold"></p>
+                        </div>
+                    </div>
+                    <button class="copy-btn mt-3 text-sm text-gray-300 hover:text-white" data-target="nether">
+                        <i class="fa fa-copy mr-1"></i>复制坐标
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 下界坐标输入 -->
+            <div class="bg-minecraft-light/60 backdrop-blur-sm rounded-xl p-6 shadow-xl border border-nether/30 transform transition-all duration-500 hover:shadow-nether/20">
+                <div class="flex items-center mb-4">
+                    <div class="w-10 h-10 rounded-full bg-nether flex items-center justify-center mr-3">
+                        <i class="fa fa-fire text-white text-xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold">下界坐标</h2>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <label for="nether-x" class="block text-sm font-medium text-gray-300 mb-1">X</label>
+                            <input type="number" id="nether-x" class="input-style w-full" placeholder="X坐标">
+                        </div>
+                        <div>
+                            <label for="nether-y" class="block text-sm font-medium text-gray-300 mb-1">Y</label>
+                            <input type="number" id="nether-y" class="input-style w-full" placeholder="Y坐标">
+                        </div>
+                        <div>
+                            <label for="nether-z" class="block text-sm font-medium text-gray-300 mb-1">Z</label>
+                            <input type="number" id="nether-z" class="input-style w-full" placeholder="Z坐标">
+                        </div>
+                    </div>
+                    
+                    <button id="to-overworld-btn" class="btn-secondary w-full mt-4">
+                        <i class="fa fa-arrow-right mr-2"></i>转换到主世界坐标
+                    </button>
+                </div>
+                
+                <div id="overworld-result" class="mt-6 p-4 bg-overworld/20 rounded-lg hidden">
+                    <h3 class="font-bold text-lg mb-2 flex items-center">
+                        <i class="fa fa-tree text-overworld mr-2"></i>对应的主世界坐标:
+                    </h3>
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                        <div class="bg-minecraft p-2 rounded">
+                            <span class="text-sm text-gray-400">X</span>
+                            <p id="result-overworld-x" class="font-bold"></p>
+                        </div>
+                        <div class="bg-minecraft p-2 rounded">
+                            <span class="text-sm text-gray-400">Y</span>
+                            <p id="result-overworld-y" class="font-bold"></p>
+                        </div>
+                        <div class="bg-minecraft p-2 rounded">
+                            <span class="text-sm text-gray-400">Z</span>
+                            <p id="result-overworld-z" class="font-bold"></p>
+                        </div>
+                    </div>
+                    <button class="copy-btn mt-3 text-sm text-gray-300 hover:text-white" data-target="overworld">
+                        <i class="fa fa-copy mr-1"></i>复制坐标
+                    </button>
+                </div>
+            </div>
+        </main>
+        
+        <!-- 说明区域 -->
+        <div class="mt-10 bg-minecraft-light/40 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-gray-700">
+            <h3 class="text-xl font-bold mb-3 flex items-center">
+                <i class="fa fa-info-circle text-yellow-400 mr-2"></i>坐标转换说明
+            </h3>
+            <ul class="list-disc list-inside space-y-2 text-gray-300">
+                <li>在我的世界中，主世界与下界的坐标转换比例为 <strong class="text-white">1:8</strong></li>
+                <li>主世界 → 下界：X和Z坐标除以8，Y坐标保持不变</li>
+                <li>下界 → 主世界：X和Z坐标乘以8，Y坐标保持不变</li>
+                <li>Y坐标通常保持不变，因为它代表高度</li>
+                <li>转换结果会四舍五入为整数，方便在游戏中输入</li>
+            </ul>
+        </div>
+        
+        <!-- 页脚 -->
+        <footer class="mt-10 text-center text-gray-400 text-sm">
+            <p>我的世界坐标转换计算器 &copy; <span id="current-year">2023</span></p>
+        </footer>
+    </div>
+    
+    <!-- 通知提示 -->
+    <div id="notification" class="fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg transform translate-x-full opacity-0 transition-all duration-300 flex items-center z-50">
+        <i class="fa fa-check-circle mr-2"></i>
+        <span>坐标已复制到剪贴板</span>
+    </div>
+
+    <script>
+        // 主世界转下界
+        document.getElementById('to-nether-btn').addEventListener('click', function() {
+            const x = parseFloat(document.getElementById('overworld-x').value);
+            const y = parseFloat(document.getElementById('overworld-y').value);
+            const z = parseFloat(document.getElementById('overworld-z').value);
+            
+            if (isNaN(x) || isNaN(y) || isNaN(z)) {
+                alert('请输入有效的坐标值');
+                return;
+            }
+            
+            // 计算下界坐标 (除以8，四舍五入)
+            const netherX = Math.round(x / 8);
+            const netherY = Math.round(y);
+            const netherZ = Math.round(z / 8);
+            
+            // 显示结果
+            document.getElementById('result-nether-x').textContent = netherX;
+            document.getElementById('result-nether-y').textContent = netherY;
+            document.getElementById('result-nether-z').textContent = netherZ;
+            
+            // 显示结果区域并添加动画
+            const resultDiv = document.getElementById('nether-result');
+            resultDiv.classList.remove('hidden');
+            resultDiv.classList.add('animate-fadeIn');
+            
+            // 自动滚动到结果
+            resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+        
+        // 下界转主世界
+        document.getElementById('to-overworld-btn').addEventListener('click', function() {
+            const x = parseFloat(document.getElementById('nether-x').value);
+            const y = parseFloat(document.getElementById('nether-y').value);
+            const z = parseFloat(document.getElementById('nether-z').value);
+            
+            if (isNaN(x) || isNaN(y) || isNaN(z)) {
+                alert('请输入有效的坐标值');
+                return;
+            }
+            
+            // 计算主世界坐标 (乘以8，四舍五入)
+            const overworldX = Math.round(x * 8);
+            const overworldY = Math.round(y);
+            const overworldZ = Math.round(z * 8);
+            
+            // 显示结果
+            document.getElementById('result-overworld-x').textContent = overworldX;
+            document.getElementById('result-overworld-y').textContent = overworldY;
+            document.getElementById('result-overworld-z').textContent = overworldZ;
+            
+            // 显示结果区域并添加动画
+            const resultDiv = document.getElementById('overworld-result');
+            resultDiv.classList.remove('hidden');
+            resultDiv.classList.add('animate-fadeIn');
+            
+            // 自动滚动到结果
+            resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+        
+        // 复制坐标功能
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const target = this.getAttribute('data-target');
+                let x, y, z;
+                
+                if (target === 'nether') {
+                    x = document.getElementById('result-nether-x').textContent;
+                    y = document.getElementById('result-nether-y').textContent;
+                    z = document.getElementById('result-nether-z').textContent;
+                } else {
+                    x = document.getElementById('result-overworld-x').textContent;
+                    y = document.getElementById('result-overworld-y').textContent;
+                    z = document.getElementById('result-overworld-z').textContent;
+                }
+                
+                // 复制到剪贴板
+                const coordinates = `${x} ${y} ${z}`;
+                
+                // 优先使用现代剪贴板API，如果不可用则使用传统方法
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(coordinates).then(showNotification);
+                } else {
+                    // 传统方法作为后备
+                    const textArea = document.createElement('textarea');
+                    textArea.value = coordinates;
+                    textArea.style.position = 'fixed';
+                    textArea.style.left = '-999999px';
+                    textArea.style.top = '-999999px';
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+                    
+                    try {
+                        document.execCommand('copy');
+                        showNotification();
+                    } catch (err) {
+                        alert('复制失败，请手动复制：' + coordinates);
+                    }
+                    
+                    document.body.removeChild(textArea);
+                }
+                
+                // 显示通知的辅助函数
+                function showNotification() {
+                    const notification = document.getElementById('notification');
+                    notification.classList.remove('translate-x-full');
+                    notification.classList.remove('opacity-0');
+                    
+                    // 3秒后隐藏通知
+                    setTimeout(() => {
+                        notification.classList.add('translate-x-full');
+                        notification.classList.add('opacity-0');
+                    }, 3000);
+                }
+            });
+        });
+        
+        // 输入框回车键触发转换
+        document.getElementById('overworld-x').addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') document.getElementById('to-nether-btn').click();
+        });
+        document.getElementById('overworld-y').addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') document.getElementById('to-nether-btn').click();
+        });
+        document.getElementById('overworld-z').addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') document.getElementById('to-nether-btn').click();
+        });
+        
+        document.getElementById('nether-x').addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') document.getElementById('to-overworld-btn').click();
+        });
+        document.getElementById('nether-y').addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') document.getElementById('to-overworld-btn').click();
+        });
+        document.getElementById('nether-z').addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') document.getElementById('to-overworld-btn').click();
+        });
+        
+        // 设置当前年份
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentYear = new Date().getFullYear();
+            document.getElementById('current-year').textContent = currentYear;
+        });
+    </script>
+</body>
+</html>
